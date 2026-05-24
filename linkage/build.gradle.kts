@@ -119,6 +119,11 @@ jreleaser {
             skipRelease = false
             skipTag = false
             gitRootSearch = true
+
+            changelog {
+                formatted = Active.ALWAYS
+                preset = "conventional-commits"
+            }
         }
     }
 
