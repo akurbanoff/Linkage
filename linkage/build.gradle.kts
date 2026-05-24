@@ -99,18 +99,6 @@ afterEvaluate {
             }
         }
     }
-
-    signing {
-        val signingKey = rootProject.file("private.pgp")
-        val signingPassword = findProperty("signing.password") as? String
-
-        if (signingKey.exists()) {
-            useInMemoryPgpKeys(signingKey.readText(), signingPassword)
-            sign(publishing.publications["release"])
-        } else {
-            throw Exception("нет ключей")
-        }
-    }
 }
 
 jreleaser {
