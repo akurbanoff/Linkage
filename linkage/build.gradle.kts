@@ -24,7 +24,7 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = true
+            isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -100,12 +100,14 @@ afterEvaluate {
     }
 
     signing {
-        val signingKey = findProperty("signing.key") as? String
+        val signingKey = rootProject.file("private.pgp")
         val signingPassword = findProperty("signing.password") as? String
 
-        if (signingKey != null) {
-            useInMemoryPgpKeys(signingKey, signingPassword)
+        if (signingKey.exists()) {
+            useInMemoryPgpKeys(signingKey.readText(), signingPassword)
             sign(publishing.publications["release"])
+        } else {
+            throw Exception("нет ключей")
         }
     }
 }
@@ -128,6 +130,8 @@ jreleaser {
     project {
         inceptionYear = "2026"
         author("Artem Kurbanov")
+        description =
+            "Linkage simplifies deep link handling in Android apps by automatically parsing URIs into Kotlin data classes or sealed class hierarchies."
     }
 
     deploy {
