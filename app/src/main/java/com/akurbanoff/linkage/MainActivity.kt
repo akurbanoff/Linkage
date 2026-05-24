@@ -12,57 +12,60 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import com.akurbanoff.linkage.ui.theme.LinkageTheme
+import io.github.akurbanoff.linkage.LinkageDeepLink
+import io.github.akurbanoff.linkage.provideLinkageParser
+import io.github.akurbanoff.linkage.provideLinkageUriConverter
 
-//sealed interface DL
-//
-//@LinkageDeepLink("app://person/{id}")
-//data class PersonDeepLink(val id: Int) : DL
-//
-//@LinkageDeepLink("app://person/{name}")
-//data class PersonNameDeepLink(val name: String) : DL
+sealed interface DL
+
+@LinkageDeepLink("app://person/{id}")
+data class PersonDeepLink(val id: Int) : DL
+
+@LinkageDeepLink("app://person/{name}")
+data class PersonNameDeepLink(val name: String) : DL
 
 class MainActivity : ComponentActivity() {
-//    private val linkageParser = provideLinkageParser()
-//    private val linkageUriConverter = provideLinkageUriConverter()
+    private val linkageParser = provideLinkageParser()
+    private val linkageUriConverter = provideLinkageUriConverter()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
         setContent {
-//            val person = linkageParser.parse<DL>("app://person/artem")
+            val person = linkageParser.parse<DL>("app://person/artem")
             LinkageTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     Column(
                         modifier = Modifier.padding(innerPadding)
                     ) {
-//                        when (person) {
-//                            is PersonDeepLink -> {
-//                                Greeting(
-//                                    name = person.id.toString(),
-//                                    modifier = Modifier.padding(innerPadding)
-//                                )
-//                            }
-//
-//                            is PersonNameDeepLink -> {
-//                                Greeting(
-//                                    name = person.name,
-//                                    modifier = Modifier.padding(innerPadding)
-//                                )
-//                            }
-//
-//                            else -> {
-//                                Greeting(
-//                                    name = "Android",
-//                                    modifier = Modifier.padding(innerPadding)
-//                                )
-//                            }
-//                        }
-//                        val uri = linkageUriConverter.toUri(person)
-//                        Greeting(
-//                            name = uri?.toString() ?: "Android Uri",
-//                            modifier = Modifier.padding(innerPadding)
-//                        )
+                        when (person) {
+                            is PersonDeepLink -> {
+                                Greeting(
+                                    name = person.id.toString(),
+                                    modifier = Modifier.padding(innerPadding)
+                                )
+                            }
+
+                            is PersonNameDeepLink -> {
+                                Greeting(
+                                    name = person.name,
+                                    modifier = Modifier.padding(innerPadding)
+                                )
+                            }
+
+                            else -> {
+                                Greeting(
+                                    name = "Android",
+                                    modifier = Modifier.padding(innerPadding)
+                                )
+                            }
+                        }
+                        val uri = linkageUriConverter.toUri(person)
+                        Greeting(
+                            name = uri?.toString() ?: "Android Uri",
+                            modifier = Modifier.padding(innerPadding)
+                        )
                     }
                 }
             }

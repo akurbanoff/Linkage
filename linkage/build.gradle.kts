@@ -8,7 +8,7 @@ plugins {
     id("org.jreleaser")
 }
 
-version = "0.0.1"
+version = "0.0.2"
 group = "io.github.akurbanoff"
 
 android {
@@ -67,7 +67,7 @@ afterEvaluate {
 
                 groupId = "io.github.akurbanoff"
                 artifactId = "linkage"
-                version = "0.0.1"
+                version = "0.0.2"
 
                 pom {
                     name.set("Deep Link Parsing Library for Kotlin (Android)")
@@ -90,9 +90,10 @@ afterEvaluate {
                     }
 
                     scm {
-                        connection.set("scm:git.github.com/akurbanoff/Linkage.git")
-                        developerConnection.set("scm:git:ssh://github.com/akurbanoff/Linkage.git")
+                        connection.set("scm:git:https://github.com/akurbanoff/Linkage.git")
+                        developerConnection.set("scm:git:git@github.com:akurbanoff/Linkage.git")
                         url.set("https://github.com/akurbanoff/Linkage.git")
+                        tag.set("Release v${project.version}")
                     }
                 }
             }
@@ -115,8 +116,8 @@ afterEvaluate {
 jreleaser {
     release {
         github {
-            skipRelease = true
-            skipTag = true
+            skipRelease = false
+            skipTag = false
             gitRootSearch = true
         }
     }
