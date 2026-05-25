@@ -18,9 +18,11 @@ package io.github.akurbanoff.linkage
 
 import io.github.akurbanoff.linkage.LinkageParserImpl.parse
 import kotlin.reflect.KClass
+import kotlin.reflect.KFunction
 import kotlin.reflect.KParameter
 import kotlin.reflect.full.findAnnotation
 import kotlin.reflect.full.primaryConstructor
+import kotlin.reflect.jvm.jvmName
 
 /**
  * Основной объект библиотеки для разбора deep link URI.
@@ -41,15 +43,18 @@ object LinkageParserImpl {
      * @param uri Ссылка deep link, которую нужно разобрать. Может быть null.
      * @return Экземпляр класса с заполненными полями, или null, если разбор не удался.
      */
-    inline fun <reified T : Any> parse(uriString: String?): T? {
+    inline fun <reified T : Any> parse(
+        uriString: String?,
+        noinline doOnError: (e: Exception, constructorName: String?) -> Unit = { _, _ -> },
+    ): T? {
         if (uriString == null) return null
 
         val kClass = T::class
 
         return if (kClass.isSealed) {
-            parseSealedClass(kClass, uriString)
+            parseSealedClass(kClass, uriString, doOnError)
         } else {
-            parseObject(kClass, uriString)
+            parseObject(kClass, uriString, doOnError)
         }
     }
 
@@ -62,7 +67,11 @@ object LinkageParserImpl {
      * @param uriString Строковое представление URI.
      * @return Экземпляр подходящего подкласса или null.
      */
-    fun <T : Any> parseSealedClass(kClass: KClass<T>, uriString: String): T? {
+    fun <T : Any> parseSealedClass(
+        kClass: KClass<T>,
+        uriString: String,
+        doOnError: (e: Exception, constructorName: String?) -> Unit,
+    ): T? {
         // Перебираем все прямые наследники sealed-класса
         for (subclass in kClass.sealedSubclasses) {
             val annotation = subclass.findAnnotation<LinkageDeepLink>() ?: continue
@@ -79,40 +88,17 @@ object LinkageParserImpl {
             }
 
             val constructor = subclass.primaryConstructor ?: return subclass.objectInstance
-            val args = mutableMapOf<KParameter, Any?>()
-            var skipThisSubclass = false
+            val args = getParamsForConstructor(constructor, valuesMap)
 
-            for (param in constructor.parameters) {
-                val paramName = param.name
-                if (paramName == null) {
-                    skipThisSubclass = true
-                    break
-                }
-
-                val stringValue = valuesMap[paramName]
-
-                if (stringValue == null) {
-                    if (!param.isOptional) {
-                        skipThisSubclass = true
-                        break
-                    }
-                    continue
-                }
-
-                val typeClassifier = param.type.classifier as? KClass<*>
-                val converted = convertValue(stringValue, typeClassifier)
-                if (converted == null) {
-                    skipThisSubclass = true
-                    break
-                }
-                args[param] = converted
+            if (args == null || args.isEmpty()) {
+                doOnError(ConstructorParamsException(kClass.jvmName), constructor.name)
+                continue
             }
-
-            if (skipThisSubclass) continue
 
             try {
                 return constructor.callBy(args)
             } catch (e: Exception) {
+                doOnError(e, constructor.name)
                 continue
             }
         }
@@ -127,13 +113,25 @@ object LinkageParserImpl {
      * @param uriString Строковое представление URI.
      * @return Экземпляр класса или null.
      */
-    fun <T : Any> parseObject(kClass: KClass<T>, uriString: String): T? {
-        val annotation = kClass.findAnnotation<LinkageDeepLink>() ?: return null
+    fun <T : Any> parseObject(
+        kClass: KClass<T>,
+        uriString: String,
+        doOnError: (e: Exception, constructorName: String?) -> Unit,
+    ): T? {
+        val annotation = kClass.findAnnotation<LinkageDeepLink>()
+        if (annotation == null) {
+            doOnError(AnnotationException(kClassName = kClass.jvmName), kClass.jvmName)
+            return null
+        }
         val patternUrl = annotation.url
         val mayContainLinkParams = annotation.mayContainLinkParams.toSet()
 
         val regex = patternToRegex(patternUrl, mayContainLinkParams)
-        val matchResult = regex.matchEntire(uriString) ?: return null
+        val matchResult = regex.matchEntire(uriString)
+        if (matchResult == null) {
+            doOnError(MatchUrlException(uriString), kClass.jvmName)
+            return null
+        }
 
         val placeholderNames = extractPlaceholderNames(patternUrl)
         val valuesMap = mutableMapOf<String, String>()
@@ -142,29 +140,125 @@ object LinkageParserImpl {
         }
 
         val constructor = kClass.primaryConstructor ?: return kClass.objectInstance
-        val args = mutableMapOf<KParameter, Any?>()
+        val args = getParamsForConstructor(constructor, valuesMap)
 
-        for (param in constructor.parameters) {
-            val paramName = param.name ?: return null
-            val stringValue = valuesMap[paramName]
-
-            if (stringValue == null) {
-                if (!param.isOptional) return null
-                continue
-            }
-
-            val typeClassifier = param.type.classifier as? KClass<*>
-            val converted = convertValue(stringValue, typeClassifier)
-                ?: return null
-            args[param] = converted
+        if (args == null || args.isEmpty()) {
+            doOnError(ConstructorParamsException(kClass.jvmName), constructor.name)
+            return null
         }
 
         return try {
             constructor.callBy(args)
         } catch (e: Exception) {
+            doOnError(e, constructor.name)
             null
         }
     }
+
+    private fun <T : Any> getParamsForConstructor(
+        constructor: KFunction<T>,
+        valuesMap: Map<String, String>,
+    ): Map<KParameter, Any?>? {
+        val args = mutableMapOf<KParameter, Any?>()
+        for (param in constructor.parameters) {
+            val paramName = param.name ?: return null
+            val stringValue = valuesMap[paramName]
+            if (stringValue != null) {
+                val type = param.type.classifier as? KClass<*> ?: return null
+                val converted = convertOrConstruct(stringValue, type, valuesMap)
+                if (converted == null) return null
+                args[param] = converted
+            } else if (!param.isOptional) {
+                return null
+            }
+        }
+        return args
+    }
+
+    /**
+     * Пытается создать объект типа [type] из строки [value].
+     * Сначала пробует стандартные типы (String, Int...), затем рекурсивно
+     * собирает объект через primary конструктор, используя [valuesMap].
+     * Если не удалось (например, параметры конструктора не соответствуют ключам),
+     * для одного параметра пытается передать [value] напрямую.
+     */
+    private fun convertOrConstruct(
+        value: String,
+        type: KClass<*>,
+        valuesMap: Map<String, String>,
+    ): Any? {
+        // стандартные типы
+        convertValue(value, type)?.let { return it }
+
+        val constructor = type.primaryConstructor ?: return null
+        if (constructor.parameters.isEmpty()) return null
+
+        // Пытаемся заполнить параметры из valuesMap по именам
+        val nestedArgs = getParamsForConstructor(constructor, valuesMap)
+        if (nestedArgs != null) {
+            return try {
+                constructor.callBy(nestedArgs)
+            } catch (e: Exception) {
+                null
+            }
+        }
+
+        // Если не вышло и конструктор имеет ровно один параметр, передаём исходную строку
+        if (constructor.parameters.size == 1) {
+            val param = constructor.parameters.single()
+            val paramType = param.type.classifier as? KClass<*>
+            val convertedInner = convertOrConstruct(value, paramType!!, valuesMap)
+                ?: return null
+            return try {
+                constructor.call(convertedInner)
+            } catch (e: Exception) {
+                null
+            }
+        }
+
+        return null
+    }
+
+//    private fun <T : Any> getParamsForConstructor(
+//        constructor: KFunction<T>?,
+//        valuesMap: MutableMap<String, String>,
+//        previousStringValue: String? = null
+//    ): MutableMap<KParameter, Any?> {
+//        val args = mutableMapOf<KParameter, Any?>()
+//
+//        if (constructor == null) return args
+//
+//        for (param in constructor.parameters) {
+//            val paramName = param.name ?: return args
+//            val stringValue = valuesMap[paramName] ?: previousStringValue
+//
+//            if (stringValue == null) {
+//                if (!param.isOptional) return args
+//                continue
+//            }
+//
+//            val typeClassifier = param.type.classifier as? KClass<*>
+//            val typeParams = typeClassifier?.primaryConstructor?.parameters
+//            if (typeParams?.isNotEmpty() == true) {
+//                val params = getParamsForConstructor(typeClassifier.primaryConstructor, valuesMap, stringValue)
+//                if (params.isNotEmpty()) {
+//                    args[param] = try {
+//                        typeClassifier.primaryConstructor?.callBy(params)
+//                    } catch (e: Exception) {
+//                        null
+//                    }
+//                }
+//            }
+//            val alreadyExists = args[param] != null
+//            if (!alreadyExists) {
+//                val converted = convertValue(stringValue, typeClassifier)
+//                    ?: return args
+//                args[param] = converted
+//            }
+//        }
+//
+//        return args
+//    }
 
     /**
      * Преобразует шаблон URL с плейсхолдерами вида `{name}` в регулярное выражение.

@@ -26,4 +26,14 @@ class LinkageUriConverterTest {
 
         assertEquals("app://note/5/artem?source=https://google.com/", uri)
     }
+
+    @Test
+    fun test_uri_converter_with_object_params() {
+        val deeplink = linkageParser.parse<TemporaryUser>(
+            "app://temporary_user/!asldkgnsalkdg/\$asdnglskdgjqpewgbk"
+        )
+        val uri = linkageUriConverter.toUriString(deeplink)
+
+        assertEquals("app://temporary_user/!asldkgnsalkdg/\$asdnglskdgjqpewgbk", uri)
+    }
 }

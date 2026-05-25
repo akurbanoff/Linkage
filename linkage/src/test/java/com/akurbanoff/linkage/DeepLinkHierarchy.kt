@@ -2,6 +2,23 @@ package com.akurbanoff.linkage
 
 import io.github.akurbanoff.linkage.LinkageDeepLink
 
+data class SessionId(val sessionId: UserId)
+
+data class UserId(val userId: String)
+
+data class Token(val token: String)
+
+data class Profile(
+    val sessionId: SessionId,
+    val info: ProfileInfo,
+)
+
+data class ProfileInfo(
+    val name: String,
+    val age: Int,
+    val isAdmin: Boolean,
+)
+
 sealed interface DeepLinkHierarchy
 
 @LinkageDeepLink("myapp://user/{name}/profile")
@@ -75,4 +92,33 @@ data class Items(
     val id: Int,
     val source: String,
     val name: String,
+)
+
+@LinkageDeepLink(
+    url = "app://session/{sessionId}"
+)
+data class Session(
+    val sessionId: SessionId,
+)
+
+@LinkageDeepLink(
+    url = "app://temporary_user/{sessionId}/{token}"
+)
+data class TemporaryUser(
+    val sessionId: SessionId,
+    val token: Token,
+)
+
+@LinkageDeepLink(
+    url = "app://session/{sessionId}"
+)
+data class SessionDeeplink(
+    val sessionId: SessionId,
+) : DeepLinkHierarchy
+
+//@LinkageDeepLink(
+//    url = "app://profile/{sessionId}/{profile}"
+//)
+data class ProfileDeeplink(
+    val profile: Profile,
 )

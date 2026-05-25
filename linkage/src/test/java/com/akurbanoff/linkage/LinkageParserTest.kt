@@ -120,4 +120,47 @@ class LinkageParserTest {
         assertEquals("https://google.com/", (deepLink as Items).source)
         assertEquals("artem", (deepLink as Items).name)
     }
+
+    @Test
+    fun test_objects_as_params_in_constructor() {
+        val deeplink = linkageParser.parse<Session>("app://session/!asldkgnsalkdg")
+
+        assert(deeplink is Session)
+        assertEquals(UserId("!asldkgnsalkdg"), deeplink?.sessionId?.sessionId)
+    }
+
+    @Test
+    fun test_deeplink_with_multiple_objects_params() {
+        val deeplink = linkageParser.parse<TemporaryUser>(
+            "app://temporary_user/!asldkgnsalkdg/\$asdnglskdgjqpewgbk"
+        )
+
+        assert(deeplink is TemporaryUser)
+        assertEquals(
+            UserId("!asldkgnsalkdg"),
+            deeplink?.sessionId?.sessionId
+        )
+        assertEquals(
+            Token("\$asdnglskdgjqpewgbk"),
+            deeplink?.token
+        )
+    }
+
+    @Test
+    fun test_object_as_param_in_constructor() {
+        val deeplink = linkageParser.parse<DeepLinkHierarchy>("app://session/!asldkgnsalkdg")
+
+        assert(deeplink is SessionDeeplink)
+        assertEquals(UserId("!asldkgnsalkdg"), (deeplink as SessionDeeplink).sessionId.sessionId)
+    }
+
+    @Test
+    fun test_do_on_error() {
+        val deeplink =
+            linkageParser.parse<ProfileDeeplink>("app://profile/!sadasgk/alex-12-false") { e, cn ->
+                assertEquals("com.akurbanoff.linkage.ProfileDeeplink", cn)
+            }
+
+        assertEquals(null, deeplink)
+    }
 }

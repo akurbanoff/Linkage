@@ -13,7 +13,7 @@ Add the library to your module's `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("com.akurbanoff:linkage:0.0.1")
+    implementation("com.akurbanoff:linkage:<version>")
 }
 ```
 

@@ -21,6 +21,7 @@ import io.github.akurbanoff.linkage.LinkageParserImpl.extractPlaceholderNames
 import kotlin.reflect.KProperty1
 import kotlin.reflect.full.findAnnotation
 import kotlin.reflect.full.memberProperties
+import kotlin.reflect.full.primaryConstructor
 
 object LinkageUriConverter {
     fun toUri(link: Any?): Uri? {
@@ -49,10 +50,34 @@ object LinkageUriConverter {
                 ?: return null
 
             @Suppress("UNCHECKED_CAST")
-            val value = (property as KProperty1<Any, *>).get(link)?.toString() ?: return null
-            resultUrl = resultUrl.replace("{$name}", value)
+            val value = (property as KProperty1<Any, *>).get(link)
+            val uriValue = unwrapToUriString(value) ?: return null
+            resultUrl = resultUrl.replace("{$name}", uriValue)
         }
 
         return resultUrl
+    }
+
+    /**
+     * Рекурсивно "разворачивает" объект до его примитивного строкового представления.
+     * Для объектов с одним параметром конструктора (value class) извлекает внутреннее значение,
+     * для примитивов и строк возвращает их toString().
+     */
+    private fun unwrapToUriString(value: Any?): String? {
+        if (value == null) return null
+        val kClass = value::class
+        when (kClass) {
+            String::class, Int::class, Long::class, Float::class,
+            Double::class, Boolean::class,
+                -> return value.toString()
+        }
+
+        val constructor = kClass.primaryConstructor ?: return null
+        if (constructor.parameters.size != 1) return null
+        val param = constructor.parameters.single()
+        val property = kClass.memberProperties.firstOrNull { it.name == param.name }
+            ?: return null
+        val innerValue = (property as KProperty1<Any, *>).get(value)
+        return unwrapToUriString(innerValue)
     }
 }
