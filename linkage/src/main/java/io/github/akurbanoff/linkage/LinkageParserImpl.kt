@@ -187,13 +187,11 @@ object LinkageParserImpl {
         type: KClass<*>,
         valuesMap: Map<String, String>,
     ): Any? {
-        // стандартные типы
         convertValue(value, type)?.let { return it }
 
         val constructor = type.primaryConstructor ?: return null
         if (constructor.parameters.isEmpty()) return null
 
-        // Пытаемся заполнить параметры из valuesMap по именам
         val nestedArgs = getParamsForConstructor(constructor, valuesMap)
         if (nestedArgs != null) {
             return try {
@@ -203,7 +201,6 @@ object LinkageParserImpl {
             }
         }
 
-        // Если не вышло и конструктор имеет ровно один параметр, передаём исходную строку
         if (constructor.parameters.size == 1) {
             val param = constructor.parameters.single()
             val paramType = param.type.classifier as? KClass<*>
@@ -218,47 +215,6 @@ object LinkageParserImpl {
 
         return null
     }
-
-//    private fun <T : Any> getParamsForConstructor(
-//        constructor: KFunction<T>?,
-//        valuesMap: MutableMap<String, String>,
-//        previousStringValue: String? = null
-//    ): MutableMap<KParameter, Any?> {
-//        val args = mutableMapOf<KParameter, Any?>()
-//
-//        if (constructor == null) return args
-//
-//        for (param in constructor.parameters) {
-//            val paramName = param.name ?: return args
-//            val stringValue = valuesMap[paramName] ?: previousStringValue
-//
-//            if (stringValue == null) {
-//                if (!param.isOptional) return args
-//                continue
-//            }
-//
-//            val typeClassifier = param.type.classifier as? KClass<*>
-//            val typeParams = typeClassifier?.primaryConstructor?.parameters
-//            if (typeParams?.isNotEmpty() == true) {
-//                val params = getParamsForConstructor(typeClassifier.primaryConstructor, valuesMap, stringValue)
-//                if (params.isNotEmpty()) {
-//                    args[param] = try {
-//                        typeClassifier.primaryConstructor?.callBy(params)
-//                    } catch (e: Exception) {
-//                        null
-//                    }
-//                }
-//            }
-//            val alreadyExists = args[param] != null
-//            if (!alreadyExists) {
-//                val converted = convertValue(stringValue, typeClassifier)
-//                    ?: return args
-//                args[param] = converted
-//            }
-//        }
-//
-//        return args
-//    }
 
     /**
      * Преобразует шаблон URL с плейсхолдерами вида `{name}` в регулярное выражение.
