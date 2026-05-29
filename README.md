@@ -1,15 +1,27 @@
 # Linkage — Deep Link Parsing Library for Kotlin (Android)
 
-## Overview
+**Linkage** is a Kotlin library for Android that simplifies deep link handling. It automatically
+parses URIs into Kotlin data classes or sealed class hierarchies, eliminating the need for manual
+string manipulation and routing logic.
 
-Linkage simplifies deep link handling in Android apps by automatically parsing URIs into Kotlin data
-classes or sealed class hierarchies. You define URL patterns with placeholders using the
-`@LinkageDeepLink` annotation, and the library does the rest — extracting parameters, converting
-types, and constructing objects.
+## ✨ Features
 
-## Installation
+* **Annotation-Driven**: Define deep link patterns directly in your Kotlin classes using
+  `@LinkageDeepLink`.
+* **Type-Safe Parsing**: The library handles URI parameter extraction, type conversion (`String`,
+  `Int`, `Long`, `Float`, `Double`, `Boolean`), and object construction.
+* **Sealed Class Support**: Model multiple, mutually exclusive deep link destinations in a type-safe
+  way. The library automatically selects the correct subclass based on the URI.
+* **Bidirectional Conversion**: Not only can you parse URIs into objects, but you can also generate
+  URIs from your data objects using `LinkageUriConverter`.
+* **Flexible Pattern Rules**: Supports path parameters with a simple `{param}` syntax and optional
+  query parameters.
+* **Error Handling**: Gracefully returns `null` if parsing fails and provides optional error
+  callbacks for debugging.
 
-Add the library to your module's `build.gradle.kts`:
+## 📦 Installation
+
+Add the library to your module's `build.gradle.kts` file:
 
 ```kotlin
 dependencies {
@@ -17,69 +29,41 @@ dependencies {
 }
 ```
 
-## Getting Started
+## 🚀 Getting Started
 
 ### 1. Define a Deep Link Pattern
 
-Annotate a class or sealed class with `@LinkageDeepLink`. Use curly braces `{param}` to
-declare placeholders that will be extracted from the URI and passed to the constructor parameters
-with matching names.
+Annotate a class or sealed class with `@LinkageDeepLink`. Use curly braces `{param}` to declare
+placeholders that will be extracted from the URI. The placeholder names must exactly match the
+constructor parameter names.
 
 ```kotlin
-sealed interface DeepLinkHierarchy
-
 @LinkageDeepLink("app://person/{id}/{name}")
 data class Person(
     val id: Int,
     val name: String
-) : DeepLinkHierarchy
-
-@LinkageDeepLink("app://room/{id}/")
-data class Room(
-    val id: Int
-) : DeepLinkHierarchy
-
-@LinkageDeepLink(
-    url = "app://note/{id}?source={source}",
-    mayContainLinkParams = ["source"]
-)
-data class Notes(
-    val id: Int,
-    val source: String
 )
 ```
 
 ### 2. Parse a URI
 
-Call `linkageParser.parse<YourClass>(uri)`. The function returns `null` if the URI doesn't match
-any pattern or if parameter extraction fails.
+Call the `parse` function provided by `LinkageParserImpl`.
 
 ```kotlin
-private val linkageParser = provideLinkageParser()
+val linkageParser = provideLinkageParser()
 
 val uri = Uri.parse("app://person/42/alex")
 val person = linkageParser.parse<Person>(uri.toString())
 
 if (person != null) {
-    println("Person ID: ${person.id}")
-}
-
-override fun onNewIntent(intent: Intent, caller: ComponentCaller) {
-    super.onNewIntent(intent, caller)
-
-    val deeplink = linkageParser.parse<DeepLinkHierarchy>(intent.data)
-
-    when (deeplink) {
-        is Person -> println("Person ID: ${deeplink.id}")
-        is Room -> println("Room ID: ${deeplink.id}")
-    }
+  println("Person ID: ${person.id}, Name: ${person.name}")
 }
 ```
 
-## Using Sealed Classes for Multiple Patterns
+### 3. Using Sealed Classes for Multiple Patterns
 
-Sealed classes allow you to handle different deep link formats in a type-safe way.  
-Annotate each subclass with its own `@LinkageDeepLink` pattern.
+For multiple deep link formats, use a sealed class. Annotate each subclass with its own
+`@LinkageDeepLink` pattern.
 
 ```kotlin
 sealed class Screen {
@@ -97,7 +81,7 @@ sealed class Screen {
 Parsing returns the appropriate subclass:
 
 ```kotlin
-val screen = linkageParser.parse<Screen>(Uri.parse("app://profile/abc123"))
+val screen = linkageParser.parse<Screen>("app://profile/abc123")
 when (screen) {
     is Screen.Profile -> println("User: ${screen.userId}")
     is Screen.Settings -> println("Section: ${screen.section}")
@@ -106,72 +90,92 @@ when (screen) {
 }
 ```
 
-## Optional Constructor Parameters
+### 4. Optional Constructor Parameters
 
-Parameters that have default values are **optional**. If the placeholder is missing from the URI,
-the default value will be used. If a required parameter (without a default) is absent, parsing
+Constructor parameters with default values are **optional**. If the placeholder is missing from the
+URI, the default value is used. If a required parameter (without a default) is absent, parsing
 returns `null`.
 
-## Pattern Format Rules
+```kotlin
+@LinkageDeepLink("app://note/{id}?source={source}")
+data class Notes(
+  val id: Int,
+  val source: String = "default" // 'source' is optional in the URI
+)
+```
 
-- Patterns must begin with a scheme (e.g., `app://`).
-- Placeholders are written as `{name}` and match any non‑empty sequence of characters except `/`,
-  `?`, `#`.
-- Query parameters and fragments are ignored during matching.
-- The same placeholder name can appear only once per pattern.
-- Name deeplink url and params exacts same name (e.g., `{isNew}` == `val isNew: Boolean`)
+## 🔄 Generating URIs from Objects
 
-Examples of valid patterns:
-
-- `app://item/{id}`
-- `myapp://user/{name}/profile`
-- `app://note/{id}?source={source}`
-
-## Complete Usage Example
+You can reverse the process and create a URI from an instance of your data class.
 
 ```kotlin
-// 1. Define your classes
-@LinkageDeepLink("app://product/{productId}")
-data class Product(val productId: Long, val track: String = "default")
+val uriConverter = provideLinkageUriConverter()
+val person = Person(42, "alex")
+val uri = uriConverter.toUri(person)
 
-// 2. Parse a URI anywhere in the app
-fun handleDeepLink(uri: Uri?) {
-    val product = linkageParser.parse<Product>(uri)
-    if (product != null) {
-        showProductScreen(product.productId)
-    } else {
-        showFallbackScreen()
-    }
+println(uri.toString()) // Output: app://person/42/alex
+```
+
+## 📜 Pattern Format Rules
+
+* Patterns must begin with a scheme (e.g., `app://`).
+* Placeholders are written as `{name}` and match any non‑empty sequence of characters except `/`,
+  `?`, `#`.
+* Query parameters and fragments are ignored during matching.
+* The same placeholder name can appear only once per pattern.
+* Placeholder names must exactly match constructor parameter names.
+
+## 🛠️ Advanced Usage
+
+### Custom Parameter Matching
+
+Use the `mayContainLinkParams` array to specify which parameters should use greedy matching,
+allowing them to include special characters like `/`, `?`, and `#`.
+
+```kotlin
+@LinkageDeepLink(
+  url = "app://webview/{url}",
+  mayContainLinkParams = ["url"]
+)
+data class WebViewLink(val url: String)
+```
+
+### Error Handling Callback
+
+The `parse` function accepts an optional `doOnError` callback for debugging purposes.
+
+```kotlin
+val person = linkageParser.parse<Person>(uri.toString()) { error, constructorName ->
+  Log.e("Linkage", "Error parsing $constructorName: ${error.message}")
 }
 ```
 
-## API Reference
+## 📚 API Reference
 
-### `linkageParserImpl.parse<T>(uriString: String?): T?`
+### `linkageParser.parse<T>(uriString: String?): T?`
 
-- **T** : The type to parse into. Must be a class or sealed class annotated with `@LinkageDeepLink`,
-  and
-  `reified` so the type is available at runtime.
-- **uriString** : The `uri.toString()` to parse. Nullable; if `null` is passed, the function returns
-  `null` immediately.
-- **Returns** : An instance of `T` populated with values from the URI, or `null` if:
-    - The URI doesn't match any pattern,
-    - Required parameters are missing,
-    - Type conversion fails,
-    - No suitable constructor is found.
+* **T**: The type to parse into. Must be a class or sealed class annotated with `@LinkageDeepLink`.
+* **uriString**: The URI string to parse. If `null` is passed, the function returns `null`
+  immediately.
+* **Returns**: An instance of `T` populated with values from the URI, or `null` if parsing fails.
 
-All other methods are internal and should not be called directly.
+### `linkageUriConverter.toUri(link: Any?): Uri?`
 
-## Error Handling & Best Practices
+* **link**: An instance of a class annotated with `@LinkageDeepLink`.
+* **Returns**: A `Uri` built from the object, or `null` if conversion fails.
 
-- Always check for `null` after parsing; handle failures gracefully (show a fallback screen,
-  redirect, etc.).
-- Use sealed classes when you have multiple mutually exclusive deep link destinations — the branch
-  selection is done automatically.
-- Keep your deep link patterns unambiguous to avoid conflicts between different subclasses.
-- For optional parameters, provide sensible default values so the URI remains shorter.
+## 🧠 How It Works Under the Hood
 
-## License
+When you call `parse<T>`:
+
+1. The library retrieves the `@LinkageDeepLink` annotation from the target class.
+2. It converts the pattern URL into a regular expression to match the incoming URI.
+3. For each placeholder in the pattern, it extracts the corresponding value from the URI.
+4. It then uses Kotlin reflection to call the primary constructor, passing in the extracted values.
+5. The library handles basic type conversions automatically for `String`, `Int`, `Long`, `Float`,
+   `Double`, and `Boolean`.
+
+## 📄 License
 
 Copyright 2026 Artem Kurbanov.
 
