@@ -21,7 +21,7 @@ dependencies {
 
 ### 1. Define a Deep Link Pattern
 
-Annotate a class or sealed class with `@DeepLink("url_pattern")`. Use curly braces `{param}` to
+Annotate a class or sealed class with `@LinkageDeepLink`. Use curly braces `{param}` to
 declare placeholders that will be extracted from the URI and passed to the constructor parameters
 with matching names.
 
@@ -51,7 +51,7 @@ data class Notes(
 
 ### 2. Parse a URI
 
-Call `LinkageParserImpl.parse<YourClass>(uri)`. The function returns `null` if the URI doesn't match
+Call `linkageParser.parse<YourClass>(uri)`. The function returns `null` if the URI doesn't match
 any pattern or if parameter extraction fails.
 
 ```kotlin
@@ -76,23 +76,10 @@ override fun onNewIntent(intent: Intent, caller: ComponentCaller) {
 }
 ```
 
-## Supported Types for Placeholder Conversion
-
-The library can convert string values from URIs into the following Kotlin types:
-
-- `String`
-- `Int`
-- `Long`
-- `Float`
-- `Double`
-- `Boolean` (strict: `"true"` → `true`, `"false"` → `false`, others → `null`)
-
-If conversion fails, the whole parse returns `null`.
-
 ## Using Sealed Classes for Multiple Patterns
 
 Sealed classes allow you to handle different deep link formats in a type-safe way.  
-Annotate each subclass with its own `@DeepLink` pattern.
+Annotate each subclass with its own `@LinkageDeepLink` pattern.
 
 ```kotlin
 sealed class Screen {
@@ -160,11 +147,12 @@ fun handleDeepLink(uri: Uri?) {
 
 ## API Reference
 
-### `LinkageParserImpl.parse<T>(uri: Uri?): T?`
+### `linkageParserImpl.parse<T>(uriString: String?): T?`
 
-- **T** : The type to parse into. Must be a class or sealed class annotated with `@DeepLink`, and
+- **T** : The type to parse into. Must be a class or sealed class annotated with `@LinkageDeepLink`,
+  and
   `reified` so the type is available at runtime.
-- **uri** : The `android.net.Uri` to parse. Nullable; if `null` is passed, the function returns
+- **uriString** : The `uri.toString()` to parse. Nullable; if `null` is passed, the function returns
   `null` immediately.
 - **Returns** : An instance of `T` populated with values from the URI, or `null` if:
     - The URI doesn't match any pattern,

@@ -8,7 +8,7 @@ plugins {
     id("org.jreleaser")
 }
 
-version = "0.0.2"
+version = "0.0.3"
 group = "io.github.akurbanoff"
 
 android {
@@ -67,7 +67,7 @@ afterEvaluate {
 
                 groupId = "io.github.akurbanoff"
                 artifactId = "linkage"
-                version = "0.0.2"
+                version = "0.0.3"
 
                 pom {
                     name.set("Deep Link Parsing Library for Kotlin (Android)")
